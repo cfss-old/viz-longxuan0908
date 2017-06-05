@@ -10,7 +10,7 @@ After you download the data, you should change the path to your local path. Then
 
 Our final product is an HTML file of our research paper.
 
-##Special note on the Rmd file. 
+## Special note on the Rmd file. 
 
 You won't get all the grpahs by simply running the Rmd file because some of the graphs are produced by HHI.R and then pasted to the Rmd file. Running those codes take too much time so those graphs are not feasible to be coded directly in Rmd. 
 
