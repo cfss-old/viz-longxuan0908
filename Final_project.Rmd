@@ -97,7 +97,6 @@ patent_nber <- patent_nber[!duplicated(patent_nber$organization), ]
 
 ```
 
-## Backgroud knowledge, what is HHI, how it works, create a simulation
 
 ## A Striking Pattern
 
