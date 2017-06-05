@@ -14,3 +14,8 @@ Our final product is an HTML file of our research paper.
 
 You won't get all the grpahs by simply running the Rmd file because some of the graphs are produced by HHI.R and then pasted to the Rmd file. Running those codes take too much time so those graphs are not feasible to be coded directly in Rmd. 
 
+### Division of labor
+
+Longxuan is responsible for coming up with the main idea, gathering and cleaning the data, procducing all the black and white graphs, as well as final debugging, prefecting, and writing the text in the HTML file.  
+Xiaoran is responsible for the barchart, the interactive chart, and the facet chart, and writing up the discussion of our visualization methods.  
+
