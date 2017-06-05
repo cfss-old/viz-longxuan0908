@@ -1,0 +1,248 @@
+---
+title: "Final Project"
+author: "Longxuan Wang & Xiaoran Cheng"
+date: "May 30, 2017"
+output: html_document
+---
+
+```{r global_options, echo=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      warning = FALSE,
+                      message=FALSE, 
+                      #make the graphs larger
+                      out.width = "100%")
+```
+
+```{r package}
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(plm)
+library(lubridate)
+library(tidyverse)
+library(plotly)
+library(stringi)
+```
+
+## Overview
+
+Commonly referred to as the "dot-com bubble", the mid 1990s saw a wave of technological innovation accompanied by soaring stock prices of those innovating firms. The bubble started to bust in 2000, and by 2002 the NASDAQ has lost nearly 70% of its peak value. An abundance of literature exists that tries to explain its formation and eventual bust. Most of the previous research efforts have focused on attributing bubble formation to excessive investment made by either individual or institutional investors. They seek to rationalize investor's investment decisions or to provide behavioral explanations for their irrationality. 
+
+Few research exists, however, that examines the types of innovations that firms undertook during that boom and bust period. Understanding how financial bubble affects firms' R&D decisions has important implications under both the standard product-variety endogenous growth model and the Schumpeterian creative destruction growth model. Are firms carrying out important and realistic innovations using the abundance of investment flowing in, or are they spending investor's money on projects that are "hot" but are highly likely to eventually fail? Does the herding behavior of investors, which is well-documented in finance literature, affect R&D decisions of the firms they invest in and of the firms that need investment money? Answers to those questions can contribute to a better understanding of the relationship between asset price bubbles and economic growth. 
+
+
+##Data
+
+```{r data cleaning, echo=FALSE, cache=TRUE}
+#patent
+application <- read_delim("C:/Users/Longxuan/OneDrive/Academics/Winter 2017/application/application.tsv", 
+                          "\t", escape_double = FALSE, trim_ws = TRUE)%>%
+  select(patent_id, date)
+
+#assignee
+assignee <- read_delim("C:/Users/Longxuan/OneDrive/Academics/Winter 2017/assignee/assignee.tsv", 
+                       "\t", escape_double = FALSE, trim_ws = TRUE)
+
+#nber
+nber <- read_delim("C:/Users/Longxuan/OneDrive/Academics/Winter 2017/nber/nber.tsv", 
+                   "\t", escape_double = FALSE, trim_ws = TRUE)
+
+
+
+assignee <- rename(assignee, assignee_id=id)
+assignee <- assignee%>%
+  filter(!is.na(organization))%>%
+  filter(!duplicated(organization))
+organization <- assignee$organization
+
+#remove non-english
+index <- grep("Non-English", iconv(organization, "UTF-8","UTF-8", sub="Non-English"))
+assignee <- assignee[-index,]
+
+#capitalization
+organization <- assignee$organization
+for (k in seq_along(organization)){
+  suppressWarnings(try(organization[k] <- toupper(organization[k]), silent = TRUE))
+}
+
+
+#remove white space
+organization <- stri_replace_all_charclass(organization, "\\p{WHITE_SPACE}","")
+
+#remove punctuation
+organization <- gsub("[[:punct:]]","", organization)
+
+#remove company identifiers
+organization <- gsub("(AB|AG|BV|CENTER|CO|COMPANY|COMPANIES|CORP|CORPORATION|DIV|GMBH|GROUP|INC|INCORPORATED|KG|LC|LIMITED|LIMITEDPARTNERSHIP|LLC|LP|LTD|NV|PLC|SA|SARL|SNC|SPA|SRL|TRUST|USA)$",
+                     "",organization)
+organization <- gsub("(CO|COMPANY|CORP|CORPORATION|GROUP|LIMITED|MANUFACTURING|MFG|PTY|USA)$",
+                     "",organization)
+#done
+assignee$organization <- organization
+
+#concordance
+patent_assignee <- read_delim("C:/Users/Longxuan/OneDrive/Academics/Winter 2017/patent_assignee/patent_assignee.tsv", 
+                              "\t", escape_double = FALSE, trim_ws = TRUE)
+
+
+patent_assignee_merge <- merge(patent_assignee, assignee)
+patent_assignee_application <- merge(patent_assignee_merge, application)
+patent_nber <- merge(patent_assignee_application, nber)
+
+patent_nber <- patent_nber[order(as.Date(patent_nber$date, format="%Y/%m/%d")),] 
+patent_nber <- patent_nber[!duplicated(patent_nber$organization), ]
+
+
+
+
+```
+
+## Backgroud knowledge, what is HHI, how it works, create a simulation
+
+## A Striking Pattern
+
+The figure below shows the Herfindahl-Hirschman Index (HHI) of patent application in each year among all the IPC subclasses. Or to put it plainly, it shows the level of concentration of patents in terms of their field. Looking at the solid line, we see that during 2000 and 2001, computer related patents are all highly concentrated in a selected few sub-fields. Comparing with other patents, the concentration level of computer patterns show a striking pattern which shows that its concentration level peaks during the tech bubble and then rapidly declined after the bubble bursted. 
+
+### Concentration index of computer patterns peaks during the dot-com bubble
+
+![](C:\Users\Longxuan\Pictures\Final_1.png)
+
+
+## Are the above pattern driven by a few large firms?
+
+The above graph shows that computer patents are highly concentrated during the dot-com bubble years. However, it is possible that the above pattern is the result of a few large firms producing a lot of patents in the same area. On the other hand, we might think the pattern occurs because a lot of different firms, large or small, are all applying for patents in the same area. This latter scenario is more economically significant because it shows that the dot-com bubble is not produced by a few firms but by a seemingly coordinated effort of a lot of different firms. 
+
+In the graph below, we show the concentration index of patents among firms. A high concentration means that most of the patents belong to a small set of selected firms, while a low concentration means that patents are distributed relatively evenly among all the firms. 
+
+### New patents are actually more evenly distributed among firms during the dot-com bubble
+
+![](C:\Users\Longxuan\Pictures\Final_2.png)
+
+## Are the above pattern driven by new firms?
+
+### The numer of new firms also peaks during the tech bubble
+```{r new firm, echo=FALSE}
+computer <- patent_nber%>%
+  dplyr::filter(subcategory_id==22)
+
+new_organization <- computer%>%
+  group_by(organization)%>%
+  mutate(year=year(date))%>%
+  mutate(new_year=pmin(year))%>%
+  select(new_year, organization)%>%
+  unique()%>%
+  ungroup()%>%
+  group_by(new_year)%>%
+  mutate(total_new=n())%>%
+  select(new_year, total_new)%>%
+  unique()%>%
+  arrange(new_year)
+
+new_organization%>%
+  dplyr::filter(new_year>=1980)%>%
+  ggplot(aes(x=new_year, y=total_new))+
+  geom_bar(stat = "identity")+
+  theme_classic()+
+  xlab("year")+
+  ylab("new firms")
+```
+
+
+
+## Are all firms producing good qualitity patents?
+
+Since we have shown that a lot of firms large and small are producing new patents, we want to know if most of the firms are simply followers or if they are producing high quality patents. One way of measuring the quality of a patent is to see how many citations it gets from later patents. A ground-breaking high value patents should have a lot of citations because later technologies all build on it. In the graph below, we show the concentration of citations among firms. A high concentration means that a selected few of firms are getting most of the citations while the remaining firms are simply followers and have few citations to their patents. This is exactly what the graph below shows. 
+
+### A few firms get most of the citations
+
+![](C:\Users\Longxuan\Pictures\Final_3.png)
+
+## Are computer patently truly special?
+Using the interactive graph below, we let you explore the patent application patterns across the years and see if you think computer patents are truly special during the dot-com bubble. 
+
+```{r interactivity}
+count_subcategory <- patent_nber %>%
+  mutate(year=year(date))%>%
+  group_by(year) %>%
+  count(subcategory_id)%>%
+  dplyr::filter(year>=1980)
+
+count_subcategory <- spread(count_subcategory, key = subcategory_id, value = n)
+names(count_subcategory)[2] <- "agri"
+
+plot_ly(count_subcategory, x = ~year, y = ~agri, type = "bar") %>%
+  layout(
+    yaxis = list(title = "new patents"),
+    updatemenus = list(
+      list(
+        x=0,
+        y = -0.5,
+        #create buttons for different statistics
+        buttons = list(
+          list(method = "restyle",
+               args = list("y", list(count_subcategory$agri)),  
+               label = "Agriculture,Food,Textiles"),
+          list(method = "restyle",
+               args = list("y", list(count_subcategory$'12')),
+               label = "Coating"),
+          list(method = "restyle",
+               args = list("y", list(count_subcategory$'13')),  
+               label = "Gas"),
+          list(method = "restyle",
+               args = list("y", list(count_subcategory$'14')),  
+               label = "Organic Compounds"),
+          list(method = "restyle",
+               args = list("y", list(count_subcategory$'15')),  
+               label = "Resins"),
+          list(method = "restyle",
+               args = list("y", list(count_subcategory$'19')),  
+               label = "Miscellaneous-chemical"),
+          list(method = "restyle",
+               args = list("y", list(count_subcategory$'21')),  
+               label = "Communications"),
+          list(method = "restyle",
+               args = list("y", list(count_subcategory$'22')),  
+               label = "Computer Hardware & Software"),
+          list(method = "restyle",
+               args = list("y", list(count_subcategory$'23')),  
+               label = "Computer Peripherials"),
+          list(method = "restyle",
+               args = list("y", list(count_subcategory$'24')),  
+               label = "Information Storage"),
+          list(method = "restyle",
+               args = list("y", list(count_subcategory$'52')),  
+               label = "Metal Working"),
+          list(method = "restyle",
+               args = list("y", list(count_subcategory$'31')),  
+               label = "Drugs"),
+          list(method = "restyle",
+               args = list("y", list(count_subcategory$'32')),  
+               label = "Surgery & Med Inst.")
+         ))
+    ))
+```
+
+### If you don't like interactivity...
+
+In the graph below we present the time trend of patent applications in the six major categories in our data in one plot. 
+```{r facet}
+category_facet <-patent_nber %>%
+  mutate(year=year(date))%>%
+  group_by(year) %>%
+  dplyr::filter(year>=1980)
+
+category_facet <- select(category_facet, year, category_id) %>%
+  count(category_id)%>%
+  filter(category_id!=7)
+
+category_facet$category_id <-factor(category_facet$category_id, label=c("Chemical", "Computers", "Medical", "Electrical", "Mechanical", "Others")) 
+
+ggplot(data = category_facet) +
+  geom_bar(mapping = aes(x=year, y=n), stat="identity")+
+  facet_wrap(~ category_id, nrow = 2)+
+  ggtitle("Number of Applications by Category")
+```
+
+
+
+
